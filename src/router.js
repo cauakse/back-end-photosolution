@@ -12,20 +12,44 @@ const TEMP_DIR = path.join('/tmp', 'temp');
 fs.mkdirSync(FILES_DIR, { recursive: true });
 fs.mkdirSync(TEMP_DIR, { recursive: true });
 
-const upload = multer({ dest: TEMP_DIR });
+const upload = multer({
+  dest: TEMP_DIR,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB
+    files: 100 // máximo de 100 arquivos
+  }
+});
 
 const router = Router();
 
-router.post("/fotos",upload.array('fotos',100),async (req,res)=>{
+router.post("/fotos", (req, res) => {
     // Enable CORS for this route
     res.header('Access-Control-Allow-Origin', '*');
     res.header('Access-Control-Allow-Methods', 'POST');
     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-    try{
-        if (!req.files || req.files.length === 0) {
-            return res.status(400).json({ error: "Nenhuma foto foi enviada." });
+    upload.array('fotos', 100)(req, res, async (err) => {
+        if (err) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(413).json({ 
+                    error: "Arquivo muito grande. O tamanho máximo permitido é 50MB por foto." 
+                });
+            }
+            if (err.code === 'LIMIT_FILE_COUNT') {
+                return res.status(413).json({ 
+                    error: "Número máximo de fotos excedido. Limite de 100 fotos por envio." 
+                });
+            }
+            return res.status(500).json({ 
+                error: "Erro ao processar upload.", 
+                details: err.message 
+            });
         }
+
+            try {
+            if (!req.files || req.files.length === 0) {
+                return res.status(400).json({ error: "Nenhuma foto foi enviada." });
+            }
 
         const existingFiles = await fs.promises.readdir(FILES_DIR);
         if (existingFiles.length > 0) {
