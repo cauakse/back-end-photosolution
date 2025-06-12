@@ -17,7 +17,16 @@ const upload = multer({ dest: TEMP_DIR });
 const router = Router();
 
 router.post("/fotos",upload.array('fotos',100),async (req,res)=>{
+    // Enable CORS for this route
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'POST');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
     try{
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ error: "Nenhuma foto foi enviada." });
+        }
+
         const existingFiles = await fs.promises.readdir(FILES_DIR);
         if (existingFiles.length > 0) {
             req.files.forEach(file => fs.unlinkSync(file.path));
@@ -44,6 +53,11 @@ router.post("/fotos",upload.array('fotos',100),async (req,res)=>{
 })
 
 router.get("/existe",(req,res)=>{
+    // Enable CORS for this route
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
     fs.readdir(FILES_DIR, (err,files)=>{
         if (err) return res.status(500).json({ error: "Erro ao acessar pasta de fotos." });
 
@@ -54,8 +68,13 @@ router.get("/existe",(req,res)=>{
 })
 
 router.get("/fotos", (req,res)=>{
-fs.readdir(FILES_DIR, (err, files) => {
-    if (err) return res.status(500).json({ error: "Erro ao acessar pasta de fotos." });
+    // Enable CORS for this route
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+    fs.readdir(FILES_DIR, (err, files) => {
+        if (err) return res.status(500).json({ error: "Erro ao acessar pasta de fotos." });
 
     if (files.length === 0) return res.status(404).json({ message: "Nenhuma foto disponível." });
 
