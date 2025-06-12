@@ -22,34 +22,16 @@ const upload = multer({
 
 const router = Router();
 
-router.post("/fotos", (req, res) => {
-    // Enable CORS for this route
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'POST');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+router.post("/fotos", upload.array('fotos', 100), async (req, res) => {
+    try {
+        // Enable CORS for this route
+        res.header('Access-Control-Allow-Origin', '*');
+        res.header('Access-Control-Allow-Methods', 'POST');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-    upload.array('fotos', 100)(req, res, async (err) => {
-        if (err) {
-            if (err.code === 'LIMIT_FILE_SIZE') {
-                return res.status(413).json({ 
-                    error: "Arquivo muito grande. O tamanho máximo permitido é 50MB por foto." 
-                });
-            }
-            if (err.code === 'LIMIT_FILE_COUNT') {
-                return res.status(413).json({ 
-                    error: "Número máximo de fotos excedido. Limite de 100 fotos por envio." 
-                });
-            }
-            return res.status(500).json({ 
-                error: "Erro ao processar upload.", 
-                details: err.message 
-            });
+        if (!req.files || req.files.length === 0) {
+            return res.status(400).json({ error: "Nenhuma foto foi enviada." });
         }
-
-            try {
-            if (!req.files || req.files.length === 0) {
-                return res.status(400).json({ error: "Nenhuma foto foi enviada." });
-            }
 
         const existingFiles = await fs.promises.readdir(FILES_DIR);
         if (existingFiles.length > 0) {
@@ -76,45 +58,62 @@ router.post("/fotos", (req, res) => {
     }
 })
 
-router.get("/existe",(req,res)=>{
-    // Enable CORS for this route
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+router.get("/existe", async (req, res) => {
+    try {
+        // Enable CORS for this route
+        res.header('Access-Control-Allow-Origin', '*');
+        res.header('Access-Control-Allow-Methods', 'GET');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-    fs.readdir(FILES_DIR, (err,files)=>{
-        if (err) return res.status(500).json({ error: "Erro ao acessar pasta de fotos." });
-
-        if (files.length === 0) 
+        const files = await fs.promises.readdir(FILES_DIR);
+        
+        if (files.length === 0) {
             return res.status(404).json({ message: "Nenhuma foto disponível." });
+        }
+        
         return res.status(200).json({ message: "Há fotos disponíveis." });
-    })
+    } catch (error) {
+        console.error('Erro ao verificar fotos:', error);
+        return res.status(500).json({ error: "Erro ao acessar pasta de fotos." });
+    }
 })
 
-router.get("/fotos", (req,res)=>{
-    // Enable CORS for this route
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+router.get("/fotos", async (req, res) => {
+    try {
+        // Enable CORS for this route
+        res.header('Access-Control-Allow-Origin', '*');
+        res.header('Access-Control-Allow-Methods', 'GET');
+        res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-    fs.readdir(FILES_DIR, (err, files) => {
-        if (err) return res.status(500).json({ error: "Erro ao acessar pasta de fotos." });
+        const files = await fs.promises.readdir(FILES_DIR);
+        
+        if (files.length === 0) {
+            return res.status(404).json({ message: "Nenhuma foto disponível." });
+        }
 
-    if (files.length === 0) return res.status(404).json({ message: "Nenhuma foto disponível." });
+        const zip = archiver("zip", { zlib: { level: 9 } });
+        zip.on('error', (err) => {
+            throw err;
+        });
 
-    const zip = archiver("zip", { zlib: { level: 9 } });
-    res.attachment("fotos.zip");
-    zip.pipe(res);
+        res.attachment("fotos.zip");
+        zip.pipe(res);
 
-    files.forEach(file => {
-      const filePath = path.join(FILES_DIR, file);
-      zip.file(filePath, { name: file });
-    });
+        for (const file of files) {
+            const filePath = path.join(FILES_DIR, file);
+            zip.file(filePath, { name: file });
+        }
 
-    zip.finalize().then(() => {
-      files.forEach(file => fs.unlinkSync(path.join(FILES_DIR, file))); // limpa pasta
-    });
-  });
+        await zip.finalize();
+        
+        // Limpa a pasta após o envio bem-sucedido
+        for (const file of files) {
+            await fs.promises.unlink(path.join(FILES_DIR, file));
+        }
+    } catch (error) {
+        console.error('Erro ao processar download:', error);
+        res.status(500).json({ error: "Erro ao processar download das fotos." });
+    }
 })
 
 export default router;
