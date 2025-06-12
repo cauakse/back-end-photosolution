@@ -15,7 +15,7 @@ fs.mkdirSync(TEMP_DIR, { recursive: true });
 const upload = multer({
   dest: TEMP_DIR,
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB
+    fileSize: 100 * 1024 * 1024, // 100MB
     files: 100 // máximo de 100 arquivos
   }
 });
